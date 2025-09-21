@@ -171,7 +171,7 @@ impl FileIO {
         let path = self.replace_path(path);
 
         let (op, relative_path) = self.inner.create_operator(&path)?;
-        let relative_path_pos = path.len() - relative_path.len();
+        let relative_path_pos: usize = path.len() - relative_path.len();
         Ok(OutputFile {
             op,
             path,
@@ -180,6 +180,10 @@ impl FileIO {
     }
 
     fn replace_path(&self, path: impl AsRef<str>) -> String {
+        if !path.as_ref().starts_with(&self.rm_prefix) {
+            return path.as_ref().to_string();
+        }
+
         let mut updated = self.add_prefix.to_string();
         updated.push_str(path.as_ref().trim_start_matches(self.rm_prefix.as_str()));
 
