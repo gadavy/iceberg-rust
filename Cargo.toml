@@ -81,6 +81,7 @@ iceberg-datafusion = { version = "0.6.0", path = "./crates/integrations/datafusi
 indicatif = "0.17"
 itertools = "0.13"
 linkedbytes = "0.1.8"
+log = "0.4.28"
 metainfo = "0.7.14"
 mimalloc = "0.1.46"
 mockall = "0.13.1"

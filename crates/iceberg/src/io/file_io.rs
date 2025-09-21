@@ -20,6 +20,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use log::trace;
 use opendal::Operator;
 use url::Url;
 
@@ -93,6 +94,8 @@ impl FileIO {
     pub async fn delete(&self, path: impl AsRef<str>) -> Result<()> {
         let path = self.replace_path(path);
 
+        trace!("FileIO.delete {}", &path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         Ok(op.delete(relative_path).await?)
     }
@@ -105,6 +108,8 @@ impl FileIO {
     #[deprecated(note = "use remove_dir_all instead", since = "0.4.0")]
     pub async fn remove_all(&self, path: impl AsRef<str>) -> Result<()> {
         let path = self.replace_path(path);
+
+        trace!("FileIO.remove_all {}", &path);
 
         let (op, relative_path) = self.inner.create_operator(&path)?;
         Ok(op.remove_all(relative_path).await?)
@@ -124,6 +129,8 @@ impl FileIO {
     pub async fn remove_dir_all(&self, path: impl AsRef<str>) -> Result<()> {
         let path = self.replace_path(path);
 
+        trace!("FileIO.remove_dir_all {}", &path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         let path = if relative_path.ends_with('/') {
             relative_path.to_string()
@@ -141,6 +148,8 @@ impl FileIO {
     pub async fn exists(&self, path: impl AsRef<str>) -> Result<bool> {
         let path = self.replace_path(path);
 
+        trace!("FileIO.path {}", &path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         Ok(op.exists(relative_path).await?)
     }
@@ -155,6 +164,12 @@ impl FileIO {
 
         let (op, relative_path) = self.inner.create_operator(&path)?;
         let relative_path_pos = path.len() - relative_path.len();
+
+        trace!(
+            "FileIO.new_input {} relative_pos={}",
+            &path, relative_path_pos
+        );
+
         Ok(InputFile {
             op,
             path,
@@ -169,6 +184,8 @@ impl FileIO {
     /// * path: It should be *absolute* path starting with scheme string used to construct [`FileIO`].
     pub fn new_output(&self, path: impl AsRef<str>) -> Result<OutputFile> {
         let path = self.replace_path(path);
+
+        trace!("FileIO.new_output {}", &path);
 
         let (op, relative_path) = self.inner.create_operator(&path)?;
         let relative_path_pos: usize = path.len() - relative_path.len();
@@ -293,6 +310,8 @@ pub trait FileRead: Send + Sync + Unpin + 'static {
 #[async_trait::async_trait]
 impl FileRead for opendal::Reader {
     async fn read(&self, range: Range<u64>) -> crate::Result<Bytes> {
+        trace!("FileRead.read {:?}", range);
+
         Ok(opendal::Reader::read(self, range).await?.to_bytes())
     }
 }
@@ -331,6 +350,8 @@ impl InputFile {
     ///
     /// For continuous reading, use [`Self::reader`] instead.
     pub async fn read(&self) -> crate::Result<Bytes> {
+        trace!("InputFile.read {}", &self.path);
+
         Ok(self
             .op
             .read(&self.path[self.relative_path_pos..])
@@ -342,6 +363,8 @@ impl InputFile {
     ///
     /// For one-time reading, use [`Self::read`] instead.
     pub async fn reader(&self) -> crate::Result<impl FileRead + use<>> {
+        trace!("InputFile.reader {}", &self.path);
+
         Ok(self.op.reader(&self.path[self.relative_path_pos..]).await?)
     }
 }
