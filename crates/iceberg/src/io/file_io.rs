@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
+use as_any::AsAny;
 use bytes::Bytes;
 use log::trace;
 use opendal::Operator;
@@ -310,7 +311,24 @@ pub trait FileRead: Send + Sync + Unpin + 'static {
 #[async_trait::async_trait]
 impl FileRead for opendal::Reader {
     async fn read(&self, range: Range<u64>) -> crate::Result<Bytes> {
-        trace!("FileRead.read {:?}", range);
+        pub struct ReadContext {
+            /// The accessor to the storage services.
+            acc: std::ptr::NonNull<dyn std::any::Any>,
+            /// Path to the file.
+            path: String,
+        }
+
+        struct Reader {
+            ctx: Arc<ReadContext>,
+        }
+
+        let ptr_self: *const opendal::Reader = self;
+        let ptr_reader: *const Reader = ptr_self as *const Reader;
+
+        unsafe {
+            let r: &Reader = &*ptr_reader;
+            trace!("FileRead.read {} {:?}", r.ctx.path, range);
+        }
 
         Ok(opendal::Reader::read(self, range).await?.to_bytes())
     }
