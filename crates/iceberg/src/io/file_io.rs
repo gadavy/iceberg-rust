@@ -48,6 +48,9 @@ pub struct FileIO {
     builder: FileIOBuilder,
 
     inner: Arc<Storage>,
+
+    rm_prefix: String,
+    add_prefix: String,
 }
 
 impl FileIO {
@@ -88,6 +91,8 @@ impl FileIO {
     ///
     /// * path: It should be *absolute* path starting with scheme string used to construct [`FileIO`].
     pub async fn delete(&self, path: impl AsRef<str>) -> Result<()> {
+        let path = self.replace_path(path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         Ok(op.delete(relative_path).await?)
     }
@@ -99,6 +104,8 @@ impl FileIO {
     /// * path: It should be *absolute* path starting with scheme string used to construct [`FileIO`].
     #[deprecated(note = "use remove_dir_all instead", since = "0.4.0")]
     pub async fn remove_all(&self, path: impl AsRef<str>) -> Result<()> {
+        let path = self.replace_path(path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         Ok(op.remove_all(relative_path).await?)
     }
@@ -115,6 +122,8 @@ impl FileIO {
     /// - If the path is a empty directory, this function will remove the directory itself.
     /// - If the path is a non-empty directory, this function will remove the directory and all nested files and directories.
     pub async fn remove_dir_all(&self, path: impl AsRef<str>) -> Result<()> {
+        let path = self.replace_path(path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         let path = if relative_path.ends_with('/') {
             relative_path.to_string()
@@ -130,6 +139,8 @@ impl FileIO {
     ///
     /// * path: It should be *absolute* path starting with scheme string used to construct [`FileIO`].
     pub async fn exists(&self, path: impl AsRef<str>) -> Result<bool> {
+        let path = self.replace_path(path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
         Ok(op.exists(relative_path).await?)
     }
@@ -140,8 +151,9 @@ impl FileIO {
     ///
     /// * path: It should be *absolute* path starting with scheme string used to construct [`FileIO`].
     pub fn new_input(&self, path: impl AsRef<str>) -> Result<InputFile> {
+        let path = self.replace_path(path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
-        let path = path.as_ref().to_string();
         let relative_path_pos = path.len() - relative_path.len();
         Ok(InputFile {
             op,
@@ -156,14 +168,22 @@ impl FileIO {
     ///
     /// * path: It should be *absolute* path starting with scheme string used to construct [`FileIO`].
     pub fn new_output(&self, path: impl AsRef<str>) -> Result<OutputFile> {
+        let path = self.replace_path(path);
+
         let (op, relative_path) = self.inner.create_operator(&path)?;
-        let path = path.as_ref().to_string();
         let relative_path_pos = path.len() - relative_path.len();
         Ok(OutputFile {
             op,
             path,
             relative_path_pos,
         })
+    }
+
+    fn replace_path(&self, path: impl AsRef<str>) -> String {
+        let mut updated = self.add_prefix.to_string();
+        updated.push_str(path.as_ref().trim_start_matches(self.rm_prefix.as_str()));
+
+        updated
     }
 }
 
@@ -222,9 +242,24 @@ impl FileIOBuilder {
     /// Builds [`FileIO`].
     pub fn build(self) -> Result<FileIO> {
         let storage = Storage::build(self.clone())?;
+
+        let rm_prefix = self
+            .props
+            .get("allow_moved_path_rm_prefix")
+            .unwrap_or(&"".to_string())
+            .clone();
+
+        let add_prefix = self
+            .props
+            .get("allow_moved_path_add_prefix")
+            .unwrap_or(&"".to_string())
+            .clone();
+
         Ok(FileIO {
             builder: self,
             inner: Arc::new(storage),
+            rm_prefix: rm_prefix,
+            add_prefix: add_prefix,
         })
     }
 }
