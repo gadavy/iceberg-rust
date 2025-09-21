@@ -313,7 +313,7 @@ impl FileRead for opendal::Reader {
     async fn read(&self, range: Range<u64>) -> crate::Result<Bytes> {
         pub struct ReadContext {
             /// The accessor to the storage services.
-            acc: std::ptr::NonNull<dyn std::any::Any>,
+            acc: std::sync::Arc<dyn std::any::Any>,
             /// Path to the file.
             path: String,
         }
