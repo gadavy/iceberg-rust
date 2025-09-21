@@ -308,29 +308,24 @@ pub trait FileRead: Send + Sync + Unpin + 'static {
     async fn read(&self, range: Range<u64>) -> crate::Result<Bytes>;
 }
 
+struct WrappedReader {
+    inner: opendal::Reader,
+    path: String,
+}
+
 #[async_trait::async_trait]
 impl FileRead for opendal::Reader {
     async fn read(&self, range: Range<u64>) -> crate::Result<Bytes> {
-        pub struct ReadContext {
-            /// The accessor to the storage services.
-            acc: std::sync::Arc<dyn std::any::Any>,
-            /// Path to the file.
-            path: String,
-        }
-
-        struct Reader {
-            ctx: Arc<ReadContext>,
-        }
-
-        let ptr_self: *const opendal::Reader = self;
-        let ptr_reader: *const Reader = ptr_self as *const Reader;
-
-        unsafe {
-            let r: &Reader = &*ptr_reader;
-            trace!("FileRead.read {} {:?}", r.ctx.path, range);
-        }
-
         Ok(opendal::Reader::read(self, range).await?.to_bytes())
+    }
+}
+
+#[async_trait::async_trait]
+impl FileRead for WrappedReader {
+    async fn read(&self, range: Range<u64>) -> crate::Result<Bytes> {
+        trace!("FileRead.read {} {:?}", &self.path, range);
+
+        Ok(opendal::Reader::read(&self.inner, range).await?.to_bytes())
     }
 }
 
@@ -383,7 +378,12 @@ impl InputFile {
     pub async fn reader(&self) -> crate::Result<impl FileRead + use<>> {
         trace!("InputFile.reader {}", &self.path);
 
-        Ok(self.op.reader(&self.path[self.relative_path_pos..]).await?)
+        let reader = WrappedReader {
+            inner: self.op.reader(&self.path[self.relative_path_pos..]).await?,
+            path: self.path.clone(),
+        };
+
+        Ok(reader)
     }
 }
 
