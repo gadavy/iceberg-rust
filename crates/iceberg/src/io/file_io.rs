@@ -363,7 +363,7 @@ impl InputFile {
     ///
     /// For continuous reading, use [`Self::reader`] instead.
     pub async fn read(&self) -> crate::Result<Bytes> {
-        trace!("InputFile.read {}", &self.path);
+        trace!("InputFile.read {}", &self.path[self.relative_path_pos..]);
 
         Ok(self
             .op
@@ -376,11 +376,11 @@ impl InputFile {
     ///
     /// For one-time reading, use [`Self::read`] instead.
     pub async fn reader(&self) -> crate::Result<impl FileRead + use<>> {
-        trace!("InputFile.reader {}", &self.path);
+        trace!("InputFile.reader {}", &self.path[self.relative_path_pos..]);
 
         let reader = WrappedReader {
             inner: self.op.reader(&self.path[self.relative_path_pos..]).await?,
-            path: self.path.clone(),
+            path: self.path[self.relative_path_pos..].to_string(),
         };
 
         Ok(reader)
